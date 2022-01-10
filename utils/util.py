@@ -18,23 +18,18 @@ def search_screen(template, monitor=0, match=cv2.TM_CCOEFF_NORMED):
 def click(x, y):
     mouse = pmouse.Controller()
     mouse.position = (x, y)
-    cv2.waitKey(1)
     mouse.press(pmouse.Button.left)
     cv2.waitKey(1)
     mouse.release(pmouse.Button.left)
-    cv2.waitKey(1)
 
-def hline(x1, x2, y, gap=18):
+def hline(x1, x2, y):
     mouse = pmouse.Controller()
     mouse.position = (x1, y)
-    cv2.waitKey(1)
     mouse.press(pmouse.Button.left)
-    for i in range(x1 + gap, x2 + gap + 1, gap):
-        cv2.waitKey(1)
-        mouse.position = (x2, y)
+    cv2.waitKey(1)
+    mouse.move(x2 - x1, 0)
     cv2.waitKey(1)
     mouse.release(pmouse.Button.left)
-    cv2.waitKey(1)
 
 def quantize(im, palette):
     dims = list(im.shape)
