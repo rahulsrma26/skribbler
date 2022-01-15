@@ -15,20 +15,20 @@ def search_screen(template, monitor=0, match=cv2.TM_CCOEFF_NORMED):
         return int(idx % w), int(idx//w), np.max(res)
 
 
-def click(x, y):
+def click(x, y, speed=1):
     mouse = pmouse.Controller()
     mouse.position = (x, y)
     mouse.press(pmouse.Button.left)
-    cv2.waitKey(1)
+    cv2.waitKey(speed)
     mouse.release(pmouse.Button.left)
 
-def hline(x1, x2, y):
+def hline(x1, x2, y, speed=1):
     mouse = pmouse.Controller()
     mouse.position = (x1, y)
     mouse.press(pmouse.Button.left)
-    cv2.waitKey(1)
+    cv2.waitKey(speed)
     mouse.move(x2 - x1, 0)
-    cv2.waitKey(1)
+    cv2.waitKey(speed)
     mouse.release(pmouse.Button.left)
 
 def quantize(im, palette):
