@@ -41,6 +41,12 @@ def quantize(im, palette):
     bst = np.argmin(res, axis=2)
     return bst
 
+def nearest_color(col, palette):
+    flt = np.array(col, dtype=np.float) / 255.0
+    flt = np.tile(flt, palette.shape[0]).reshape([-1, 3])
+    pal = palette.astype(float) / 255.0
+    return np.argmin(np.linalg.norm(flt - pal, axis=1))
+
 def image_from_url(url):
     resp = requests.get(url, stream=True).raw
     print(resp.read())
