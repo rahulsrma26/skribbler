@@ -25,10 +25,10 @@ class SVGElement:
 
 
 class SVG:
-    DIST_THRESHOLD = 100
+    DIST_THRESHOLD = 50
     PIXEL_THRESHOLD = 20
     ANGLE_THRESHOLD = 0.3
-    HUMAN_ERROR = 2
+    HUMAN_ERROR = 1
 
     def __init__(self, viewbox, paths) -> None:
         self.vb = viewbox
@@ -49,15 +49,17 @@ class SVG:
 
     def _bz(self, pts, l, r):
         x1, y1 = self._calc(pts, l)
+        x3, y3 = self._calc(pts, r)
         m = (l + r) / 2
         x2, y2 = self._calc(pts, m)
-        x2 = int(x2 + random.uniform(-self.HUMAN_ERROR, self.HUMAN_ERROR))
-        y2 = int(y2 + random.uniform(-self.HUMAN_ERROR, self.HUMAN_ERROR))
+        dist = math.dist((x1, y1), (x3, y3))
+        delta = random.uniform(-self.HUMAN_ERROR, self.HUMAN_ERROR)
+        x2 = int(x2 + delta * min(1, dist / self.PIXEL_THRESHOLD))
+        delta = random.uniform(-self.HUMAN_ERROR, self.HUMAN_ERROR)
+        y2 = int(y2 + delta * min(1, dist / self.PIXEL_THRESHOLD))
         x2 = min(max(x2, self.left), self.right)
         y2 = min(max(y2, self.top), self.bottom)
-        x3, y3 = self._calc(pts, r)
         split = False
-        dist = math.dist((x1, y1), (x3, y3))
         if dist > self.DIST_THRESHOLD:
             # print('d', math.dist((x1, y1), (x3, y3)))
             split = True
