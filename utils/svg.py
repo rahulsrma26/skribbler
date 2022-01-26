@@ -14,14 +14,40 @@ def hexcolor2RGB(code: str):
 class SVGElement:
     def __init__(self, elem):
         self.elem = elem
-        self.path = Path(elem.getAttribute("d"))
         self.style = dict([tuple(e.split(':')) for e in elem.getAttribute('style').split(';')])
         self.thickness = int(float(self.style['stroke-width']) * 1.2)
         self.color = hexcolor2RGB(self.style['stroke'])
         self.fill = hexcolor2RGB(self.style['fill'])
 
+
+class PathElement(SVGElement):
+    def __init__(self, elem):
+        super().__init__(elem)
+        self.path = Path(elem.getAttribute("d"))
+
     def __str__(self):
         return str(self.path._segments)
+
+    @staticmethod
+    def fromCircle(elem):
+        r = float(elem.getAttribute('r'))
+        elem.setAttribute('rx', r)
+        elem.setAttribute('ry', r)
+        return PathElement.fromEllipse(elem)
+
+    @staticmethod
+    def fromEllipse(elem):
+        D = 0.552284749831
+        cx = float(elem.getAttribute('cx'))
+        cy = float(elem.getAttribute('cy'))
+        rx = float(elem.getAttribute('rx'))
+        ry = float(elem.getAttribute('ry'))
+        s = f'm {cx-rx},{cy} c 0,{-D*ry} {rx*(1-D)},{-ry} {rx},{-ry}'
+        s += f' {D*rx},0 {rx},{ry*(1-D)} {rx},{ry}'
+        s += f' 0,{D*ry} {-rx*(1-D)},{ry} {-rx},{ry}'
+        s += f' {-D*rx},0 {-rx},{-ry*(1-D)} {-rx},{-ry}'
+        elem.setAttribute('d', s)
+        return PathElement(elem)
 
 
 class SVG:
@@ -29,11 +55,13 @@ class SVG:
     PIXEL_THRESHOLD = 20
     ANGLE_THRESHOLD = 0.3
     HUMAN_ERROR = 1
+    ROUND = 0.5
+    CORE = {'#text', 'sodipodi:namedview', 'defs', 'metadata'}
 
-    def __init__(self, viewbox, paths) -> None:
+    def __init__(self, viewbox, objs) -> None:
         self.vb = viewbox
         self.left, self.top, self.right, self.bottom = [int(x) for x in self.vb.split()]
-        self.paths = [SVGElement(p) for p in paths]
+        self.paths = objs
 
     def __str__(self) -> str:
         s = f'SVG {self.vb}'
@@ -45,7 +73,7 @@ class SVG:
         ps = []
         for i in range(2):
             ps.append(((1-t)**3)*p[0][i] + 3*(1-t)*(1-t)*t*p[1][i] + 3*(1-t)*t*t*p[2][i] + (t**3)*p[3][i])
-        return tuple([int(x) for x in ps])
+        return tuple([int(x + SVG.ROUND) for x in ps])
 
     def _bz(self, pts, l, r):
         x1, y1 = self._calc(pts, l)
@@ -77,20 +105,25 @@ class SVG:
     def _ln(self, x1, y1, x2, y2):
         dist = math.dist((x1, y1), (x2, y2))
         if dist > self.DIST_THRESHOLD:
-            xm = int((x1 + x2) / 2 + random.uniform(-self.HUMAN_ERROR, self.HUMAN_ERROR))
-            ym = int((y1 + y2) / 2 + random.uniform(-self.HUMAN_ERROR, self.HUMAN_ERROR))
+            xm = int((x1 + x2) / 2 + random.uniform(-self.HUMAN_ERROR, self.HUMAN_ERROR) + SVG.ROUND)
+            ym = int((y1 + y2) / 2 + random.uniform(-self.HUMAN_ERROR, self.HUMAN_ERROR) + SVG.ROUND)
             xm = min(max(xm, self.left), self.right)
             ym = min(max(ym, self.top), self.bottom)
             return self._ln(x1, y1, xm, ym) + self._ln(xm, ym, x2, y2)
         else:
             return [(x2, y2)]
 
-    def get_points(self, elem: SVGElement):
+    def is_inside(self, point):
+        x , y = point
+        if x < self.left or x > self.right or y < self.top or y > self.bottom:
+            return False
+        return True
+
+    def get_points(self, elem: PathElement):
         for obj in elem.path:
             if isinstance(obj, Line) or isinstance(obj, Close):
-                #Todo: break lines
-                start = tuple([int(x) for x in obj.start])
-                end = tuple([int(x) for x in obj.end])
+                start = tuple([int(x + SVG.ROUND) for x in obj.start])
+                end = tuple([int(x + SVG.ROUND) for x in obj.end])
                 yield [start] + self._ln(*start, *end)
             elif isinstance(obj, CubicBezier):
                 pts = [obj.start, obj.control1, obj.control2, obj.end]
@@ -107,4 +140,16 @@ class SVG:
             if not svg:
                 raise ValueError('No svg tag found')
             svg = svg[0]
-            return cls(svg.getAttribute('viewBox'), svg.getElementsByTagName('path'))
+            objs = []
+            for child in svg.childNodes:
+                if child.nodeName in cls.CORE:
+                    continue
+                if child.nodeName == 'path':
+                    objs.append(PathElement(child))
+                elif child.nodeName == 'circle':
+                    objs.append(PathElement.fromCircle(child))
+                elif child.nodeName == 'ellipse':
+                    objs.append(PathElement.fromEllipse(child))
+                else:
+                    print(f'Warning! tag {child.nodeName} not supported')
+            return cls(svg.getAttribute('viewBox'), objs)
