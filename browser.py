@@ -2,9 +2,8 @@ import time
 import clipboard
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.action_chains import ActionChains
 from selenium.common import exceptions
-from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.color import Color
 from selenium.webdriver.support.select import Select
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -25,6 +24,7 @@ class Browser:
         Browser.count += 1
         self.options = self.word = None
         self.rounds = self.draw_time = None
+        self.loaded = False
 
 
     def go_to_url(self, url, retries=5):
@@ -40,7 +40,7 @@ class Browser:
         return None
 
 
-    def create(self, rounds=3, draw_time=180):
+    def create(self, rounds=3, draw_time=180, custom_words='', custom_only=False):
         if not self.go_to_url(self.URL):
             print("Error!!! Check internet!!!")
             quit()
@@ -59,6 +59,11 @@ class Browser:
         Select(WebDriverWait(self.driver, self.TIME_LIMIT).until(
             EC.visibility_of_element_located((By.ID, 'lobbySetDrawTime')))
         ).select_by_visible_text(str(draw_time))
+
+        if custom_words:
+            self.driver.find_element(By.ID, 'lobbySetCustomWords').send_keys(custom_words)
+            if custom_only:
+                self.driver.find_element(By.ID, 'lobbyCustomWordsExclusive').click()
 
         self.driver.find_element(By.ID, 'inviteCopyButton').click()
         return clipboard.paste()
@@ -138,3 +143,11 @@ class Browser:
         except exceptions.WebDriverException as e:
             print('!!! Window Closed !!!', e)
             return False
+
+
+if __name__ =='__main__':
+    player = Browser()
+    # player.create(rounds=7, custom_words='a,b,c,d', custom_only=True)
+    player.join()
+    time.sleep(4)
+    player.close()
