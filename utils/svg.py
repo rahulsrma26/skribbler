@@ -15,7 +15,7 @@ class SVGElement:
     def __init__(self, elem):
         self.elem = elem
         self.style = dict([tuple(e.split(':')) for e in elem.getAttribute('style').split(';')])
-        self.thickness = int(float(self.style['stroke-width']) * 1.2)
+        self.thickness = int(float(self.style['stroke-width']) + 0.5)
         self.color = hexcolor2RGB(self.style['stroke'])
         self.fill = hexcolor2RGB(self.style['fill'])
 
@@ -104,7 +104,7 @@ class SVG:
 
     def _ln(self, x1, y1, x2, y2):
         dist = math.dist((x1, y1), (x2, y2))
-        if dist > self.DIST_THRESHOLD:
+        if dist > self.PIXEL_THRESHOLD:
             xm = int((x1 + x2) / 2 + random.uniform(-self.HUMAN_ERROR, self.HUMAN_ERROR) + SVG.ROUND)
             ym = int((y1 + y2) / 2 + random.uniform(-self.HUMAN_ERROR, self.HUMAN_ERROR) + SVG.ROUND)
             xm = min(max(xm, self.left), self.right)
@@ -118,6 +118,15 @@ class SVG:
         if x < self.left or x > self.right or y < self.top or y > self.bottom:
             return False
         return True
+
+
+    def is_solo_line(self, elem: PathElement):
+        if len(elem.path) == 2:
+            obj = elem.path[1]
+            if isinstance(obj, Line) or isinstance(obj, Close):
+                return True
+        return False
+
 
     def get_points(self, elem: PathElement):
         for obj in elem.path:
