@@ -69,17 +69,18 @@ class SVG:
             s += f'\n|- {path}'
         return s
 
-    def _calc(self, p, t):
+    @staticmethod
+    def _calc(p, t):
         ps = []
         for i in range(2):
             ps.append(((1-t)**3)*p[0][i] + 3*(1-t)*(1-t)*t*p[1][i] + 3*(1-t)*t*t*p[2][i] + (t**3)*p[3][i])
         return tuple([int(x + SVG.ROUND) for x in ps])
 
     def _bz(self, pts, l, r):
-        x1, y1 = self._calc(pts, l)
-        x3, y3 = self._calc(pts, r)
+        x1, y1 = SVG._calc(pts, l)
+        x3, y3 = SVG._calc(pts, r)
         m = (l + r) / 2
-        x2, y2 = self._calc(pts, m)
+        x2, y2 = SVG._calc(pts, m)
         dist = math.dist((x1, y1), (x3, y3))
         delta = random.uniform(-self.HUMAN_ERROR, self.HUMAN_ERROR)
         x2 = int(x2 + delta * min(1, dist / self.PIXEL_THRESHOLD))
@@ -136,7 +137,7 @@ class SVG:
                 yield [start] + self._ln(*start, *end)
             elif isinstance(obj, CubicBezier):
                 pts = [obj.start, obj.control1, obj.control2, obj.end]
-                yield [self._calc(pts, 0)] + self._bz(pts, 0, 1)
+                yield [SVG._calc(pts, 0)] + self._bz(pts, 0, 1)
             else:
                 if not isinstance(obj, Move):
                     print(f'type {type(obj)} not supported')
