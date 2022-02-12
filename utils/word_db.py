@@ -3,22 +3,21 @@ import pandas as pd
 
 
 class WordDB:
-    WORD = 'word'
-    RANK = 'rank'
-    FWD = 'fwd'
-    CHARS = 'chars'
-    WORDS = 'words'
-    IMAGE = 'image'
+    WORD = 'Word'
+    FWD = 'Fwd'
+    CHARS = 'Chars'
+    WORDS = 'Words'
+    IMAGE = 'Image'
 
 
     def __init__(self, filepath):
         self.df = self.load(filepath)
+        self.words = set(self.df[self.WORD].tolist())
         self.tree = self.build()
 
 
     def load(self, filepath):
         df = pd.read_csv(filepath, sep=',', dtype={
-            self.RANK: int,
             self.WORD: str,
             self.FWD: str
         })
@@ -34,19 +33,16 @@ class WordDB:
         return df
 
 
-    def words(self):
-        return self.df[self.WORD].tolist()
-
-
     def build(self):
         tree = {c:defaultdict(list) for c in 'abcdefghijklmnopqrstuvwxyz -./'}
-        for word in self.words():
+        for word in self.words:
             for i, c in enumerate(word):
                 tree[c][i].append(word)
         return tree
 
 
     def find(self, word):
+        word = word.lower()
         print(f'Searching for {word} ...')
         df = self.df
         df = df[df[self.CHARS] == len(word)]
@@ -70,25 +66,15 @@ class WordDB:
             print()
 
 
-    def rank(self, word):
-        df = self.df
-        match = df.loc[df[self.WORD] == word.lower()]
-        if match[self.RANK].values:
-            return match[self.RANK].values[0]
-        print(f'!!! Error: word not found {word}')
-        return 0
-
-
     def image(self, word):
         df = self.df
         match = df.loc[df[self.WORD] == word.lower()]
         if len(match[self.IMAGE].values):
             return match[self.IMAGE].values[0]
-        print(f'!!! Error: word not found {word}')
+        print(f'!!! Error: word not found `{word}`')
 
 
-
-# print(WordDB('resources/counts.txt').df)
-# worddb('resources/counts.txt').stats(['tie', 'cat'])
-# WordDB('resources/counts.txt').find('___b_')
-# WordDB('resources/counts.txt').find('a__')
+# print(WordDB('resources/words.csv').df)
+# worddb('resources/words.csv').stats(['tie', 'cat'])
+# WordDB('resources/words.csv').find('___b_')
+# WordDB('resources/words.csv').find('a__')
