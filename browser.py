@@ -1,4 +1,9 @@
+import random
 import time
+import base64
+import logging
+from enum import Enum
+import numpy as np
 import clipboard
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -6,7 +11,27 @@ from selenium.common import exceptions
 from selenium.webdriver.support.color import Color
 from selenium.webdriver.support.select import Select
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support import expected_conditions as EC
+
+from utils.svg import SVG
+from utils.palette import Palette
+# from utils.util import nearest_color
+from utils.mouse import Mouse
+
+
+class Stage(Enum):
+    AD = 0
+    LOADING = 1
+    LOGIN = 2
+    TRANSITION = 3
+    GUSSING = 4
+    SELECTION = 5
+    DRAWING = 6
+
+
+def coord(location: dict):
+    return np.array([location['x'], location['y']])
 
 
 class Browser:
@@ -15,19 +40,31 @@ class Browser:
     WAIT_TIME = 0.5
     TYPE_SPEED = 0.1
     count = 0
+    BENCHMARK = False
 
 
-    def __init__(self):
-        self.driver = webdriver.Chrome('chromedriver.exe')
-        self.driver.set_window_size(1200, 800 + 45)
-        self.driver.set_window_position(1200 * Browser.count, 50)
+    def __init__(self, action=False, logger=None):
+        self.logger = logger or logging.getLogger(__file__)
+        chrome_options = webdriver.ChromeOptions()
+        chrome_options.add_experimental_option("excludeSwitches", ['enable-automation'])
+        self.driver = webdriver.Chrome('chromedriver.exe', options=chrome_options)
+        self.driver.set_window_size(1380, 920)
+        self.driver.set_window_position(1380 * Browser.count, 10)
+        self.offsetX = self.driver.execute_script('return window.outerWidth - window.innerWidth;') // 2
+        self.offsetY = self.driver.execute_script('return window.outerHeight - window.innerHeight;') - self.offsetX
+        self.offset = np.array([self.offsetX, self.offsetY])
+        self.mouse = Mouse()
+        self.action = action
         Browser.count += 1
         self.options = self.word = None
         self.rounds = self.draw_time = None
         self.loaded = False
+        self.resert_draw(0)
 
 
-    def go_to_url(self, url, retries=5):
+    def go_to_url(self, url=None, retries=5):
+        if not url:
+            url = self.URL
         for _ in range(retries):
             try:
                 self.driver.get(url)
@@ -40,52 +77,297 @@ class Browser:
         return None
 
 
-    def create(self, rounds=3, draw_time=180, custom_words='', custom_only=False):
-        if not self.go_to_url(self.URL):
+    def _click(self, elem):
+        if self.action:
+            self.mouse.move_to(self._get_location(elem))
+        elem.click()
+
+
+    def _type(self, elem, text):
+        if self.action:
+            self.mouse.move_to(self._get_location(elem)).click()
+        for c in text:
+            elem.send_keys(c)
+            time.sleep(self.TYPE_SPEED)
+
+
+    def _choose(self, elem, option):
+        if self.action:
+            self.mouse.move_to(self._get_location(elem)).click()
+        Select(elem).select_by_visible_text(option)
+
+
+    def create(self, rounds=3, draw_time=180, custom_words='', custom_only=False, name=None):
+        if not self.go_to_url():
             print("Error!!! Check internet!!!")
             quit()
         self.rounds = rounds
         self.draw_time = draw_time
-
         time.sleep(self.WAIT_TIME)
-        WebDriverWait(self.driver, self.TIME_LIMIT).until(
-            EC.visibility_of_element_located((By.ID, 'buttonLoginCreatePrivate'))).click()
 
+        if name:
+            elem = WebDriverWait(self.driver, self.TIME_LIMIT).until(
+                EC.visibility_of_element_located((By.ID, 'inputName')))
+            self._type(elem, name)
+
+        elem = WebDriverWait(self.driver, self.TIME_LIMIT).until(
+            EC.visibility_of_element_located((By.ID, 'buttonLoginCreatePrivate')))
+        self._click(elem)
         time.sleep(self.WAIT_TIME)
-        Select(WebDriverWait(self.driver, self.TIME_LIMIT).until(
+
+        elem = WebDriverWait(self.driver, self.TIME_LIMIT).until(
             EC.visibility_of_element_located((By.ID, 'lobbySetRounds')))
-        ).select_by_visible_text(str(rounds))
+        self._choose(elem, str(rounds))
 
-        Select(WebDriverWait(self.driver, self.TIME_LIMIT).until(
+        elem = WebDriverWait(self.driver, self.TIME_LIMIT).until(
             EC.visibility_of_element_located((By.ID, 'lobbySetDrawTime')))
-        ).select_by_visible_text(str(draw_time))
+        self._choose(elem, str(draw_time))
 
         if custom_words:
             self.driver.find_element(By.ID, 'lobbySetCustomWords').send_keys(custom_words)
             if custom_only:
-                self.driver.find_element(By.ID, 'lobbyCustomWordsExclusive').click()
+                self._click(self.driver.find_element(By.ID, 'lobbyCustomWordsExclusive'))
 
-        self.driver.find_element(By.ID, 'inviteCopyButton').click()
+        self._click(self.driver.find_element(By.ID, 'inviteCopyButton'))
         return clipboard.paste()
 
 
-    def join(self, url=None):
-        if not url:
-            url = self.URL
+    def join(self, url=None, name=None):
         if not self.go_to_url(url):
             print("Error!!! Check internet!!!")
             quit()
+        time.sleep(self.WAIT_TIME)
+
+        if name:
+            elem = WebDriverWait(self.driver, self.TIME_LIMIT).until(
+                EC.visibility_of_element_located((By.ID, 'inputName')))
+            self._type(elem, name)
+
+        elem = WebDriverWait(self.driver, self.TIME_LIMIT).until(
+            EC.visibility_of_element_located((By.ID, 'formLogin'))).find_element(
+            By.TAG_NAME, 'button')
+        self._click(elem)
 
         time.sleep(self.WAIT_TIME)
-        WebDriverWait(self.driver, self.TIME_LIMIT).until(
-            EC.visibility_of_element_located((By.ID, 'formLogin'))).find_element(
-            By.TAG_NAME, 'button').click()
+        self.load()
+
+
+    def stage(self):
+        try:
+            try:
+                if self.driver.find_element(By.ID, 'aipPrerollContainer').is_displayed():
+                    return Stage.AD
+            except exceptions.NoSuchElementException:
+                pass
+            if self.driver.find_element(By.ID, 'loginAvatarCustomizeContainer').is_displayed():
+                self.loaded = False
+                return Stage.LOGIN
+            self.load()
+            overlay = self.driver.find_element(By.ID, 'overlay')
+            if overlay.is_displayed():
+                if overlay.find_element(By.CLASS_NAME, 'wordContainer').is_displayed():
+                    return Stage.SELECTION
+                else:
+                    return Stage.TRANSITION
+            elif self.toolbar.is_displayed():
+                return Stage.DRAWING
+            else:
+                return Stage.GUSSING
+        except exceptions.NoSuchElementException:
+            pass
+        return Stage.LOADING
+
+
+    def _load_colors(self, toolbar):
+        colors = {}
+        for e in toolbar.find_elements(By.CLASS_NAME, 'colorItem'):
+            idx = int(e.get_attribute('data-color'))
+            colors[idx] = e
+        return colors
+
+
+    def _create_palette(self, colors):
+        palette = []
+        for i in sorted(colors.keys()):
+            col = Color.from_string(colors[i].value_of_css_property('background-color'))
+            palette.append([col.blue, col.green, col.red])
+        return Palette(palette)
+
+
+    def _load_tools(self, toolbar):
+        tools = {}
+        elem = toolbar.find_element(By.CLASS_NAME, 'containerTools')
+        for e in elem.find_elements(By.CLASS_NAME, 'tool'):
+            name = e.get_attribute('data-tool')
+            tools[name] = e
+            if 'toolActive' in e.get_attribute('class'):
+                self.current_tool = name
+        return tools
+
+
+    def _load_brushes(self, toolbar):
+        convert = {'0': 3, '0.15': 7, '0.45': 19, '1': 39}
+        brushes = {}
+        elem = toolbar.find_element(By.CLASS_NAME, 'containerBrushSizes')
+        for e in elem.find_elements(By.CLASS_NAME, 'brushSize'):
+            s = e.get_attribute('data-size')
+            brushes[convert[s]] = e
+        return brushes
+
+
+    def get_current_word(self):
+        return self.driver.find_element(By.ID, 'currentWord').text
+
+
+    def set_current_word(self, word):
+        element = self.driver.find_element_by_id('currentWord')
+        self.driver.execute_script(f'arguments[0].innerText = "{word}"', element)
+
+
+    def load(self):
+        if not self.loaded:
+            self.toolbar = self.driver.find_element(By.CLASS_NAME, 'containerToolbar')
+            self.colors = self._load_colors(self.toolbar)
+            self.palette = self._create_palette(self.colors)
+            self.tools = self._load_tools(self.toolbar)
+            self.brushes = self._load_brushes(self.toolbar)
+            self.canvas = self.driver.find_element(By.ID, 'canvasGame')
+            self.loaded = True
+
+
+    def save_canvas(self, filepath):
+        with open(filepath, 'wb') as f:
+            f.write(self.get_canvas())
+
+
+    def get_canvas(self):
+        canvas_base64 = self.driver.execute_script("return arguments[0].toDataURL('image/png').substring(21);", self.canvas)
+        return base64.b64decode(canvas_base64)
+
+
+    def delay(self, multiplier):
+        if self.speed:
+            if not self.BENCHMARK:
+                multiplier = (multiplier / 2) + random.random() * multiplier
+            time.sleep(self.speed * 0.001 * multiplier)
+
+
+    def resert_draw(self, speed):
+        self.current_tool = self.current_brush = self.current_color = None
+        self.speed = speed
+
+
+    def _get_location(self, elem, center = True):
+        window = coord(self.driver.get_window_position())
+        if center:
+            window += np.array([elem.size['width'], elem.size['height']]) // 2
+        elem = coord(elem.location)
+        return window + elem + self.offset
+
+
+    def clear_canvas(self):
+        elem = self.driver.find_element(By.ID, 'buttonClearCanvas')
+        if self.action:
+            self.mouse.move_to(self._get_location(elem)).click()
+        else:
+            elem.click()
+
+
+    def changeTool(self, name):
+        if self.current_tool != name:
+            self.logger.debug(f'Changing tool from {self.current_tool} to {name}')
+            if self.action:
+                self.mouse.move_to(self._get_location(self.tools[name])).click()
+            else:
+                self.delay(5)
+                self.tools[name].click()
+            self.current_tool = name
+
+
+    def changeBrush(self, size):
+        if self.current_brush != size:
+            self.logger.debug(f'Changing brush from {self.current_brush} to {size}')
+            if self.action:
+                self.mouse.move_to(self._get_location(self.brushes[size])).click()
+            else:
+                self.delay(5)
+                self.brushes[size].click()
+            self.current_brush = size
+
+
+    def changeColor(self, idx):
+        if self.current_color != idx:
+            self.logger.debug(f'Changing color from {self.current_color} to {idx}')
+            if self.action:
+                self.mouse.move_to(self._get_location(self.colors[idx])).click()
+            else:
+                self.delay(5)
+                self.colors[idx].click()
+            self.current_color = idx
+
+
+    def draw(self, svg, speed=0):
+        self.resert_draw(speed)
+        sizes = np.array(sorted(self.brushes.keys()), dtype=np.int32)
+        canvas = self._get_location(self.canvas, False)
+        cmx, cmy = self.canvas.size['width'] // 2, self.canvas.size['height'] // 2
+        for obj in svg.paths:
+            if not self.toolbar.is_displayed():
+                return
+            ac = None
+            if obj.color:
+                self.changeTool('pen')
+                self.changeBrush(sizes[np.argmin(np.abs(sizes - obj.thickness))])
+                self.changeColor(self.palette.nearest(obj.color))
+                dur = speed // 2 if svg.is_solo_line(obj) else speed
+                if not self.action:
+                    ac = ActionChains(self.driver, duration=dur).move_to_element(self.canvas)
+                    ac = ac.move_by_offset(-cmx, -cmy)
+                lst = 0, 0
+                for lines in svg.get_points(obj):
+                    if not self.toolbar.is_displayed():
+                        return
+                    cur = lines[0]
+                    if self.action:
+                        self.mouse.move_to(cur + canvas).press()
+                    else:
+                        dx, dy = cur[0] - lst[0], cur[1] - lst[1]
+                        ac = ac.move_by_offset(dx, dy).click_and_hold()
+                    lst = cur
+                    for cur in lines[1:]:
+                        if self.action:
+                            self.mouse.move_to(cur + canvas, False)
+                        else:
+                            dx, dy = cur[0] - lst[0], cur[1] - lst[1]
+                            ac = ac.move_by_offset(dx, dy)
+                        lst = cur
+                if self.action:
+                    self.mouse.release()
+                else:
+                    ac.release().perform()
+            if obj.fill:
+                self.changeTool('fill')
+                self.changeColor(self.palette.nearest(obj.fill))
+                if self.action:
+                    self.mouse.move_to(np.array([obj.cx, obj.cy]) + canvas).click()
+                else:
+                    self.delay(5)
+                    ac = ActionChains(self.driver, duration=speed).move_to_element(self.canvas)
+                    ac.move_by_offset(obj.cx - cmx, obj.cy - cmy).click().perform()
 
 
     def start(self):
-        WebDriverWait(self.driver, self.TIME_LIMIT).until(
-            EC.visibility_of_element_located((By.ID, 'buttonLobbyPlay'))).click()
+        elem = WebDriverWait(self.driver, self.TIME_LIMIT).until(
+            EC.visibility_of_element_located((By.ID, 'buttonLobbyPlay')))
+        self._click(elem)
         time.sleep(self.WAIT_TIME)
+        self.load()
+
+
+    def toggle_audio(self):
+        elem = WebDriverWait(self.driver, self.TIME_LIMIT).until(
+            EC.visibility_of_element_located((By.ID, 'audio')))
+        self._click(elem)
 
 
     def num_players(self):
@@ -119,17 +401,23 @@ class Browser:
         if self.options:
             for k, v in self.options:
                 if k == word:
-                    v.click()
+                    if self.action:
+                        self.mouse.move_to(self._get_location(v)).click()
+                    else:
+                        self.delay(5)
+                        v.click()
                     self.wait_till_overlay_goes_away()
                     self.word = word
                     return
 
 
+    def focus_chat(self):
+        self.driver.find_element(By.ID, 'inputChat').click()
+
+
     def type(self, text):
         elem = self.driver.find_element(By.ID, 'inputChat')
-        for c in text:
-            elem.send_keys(c)
-            time.sleep(self.TYPE_SPEED)
+        self._type(elem, text)
 
 
     def close(self):
@@ -145,9 +433,49 @@ class Browser:
             return False
 
 
-if __name__ =='__main__':
-    player = Browser()
-    # player.create(rounds=7, custom_words='a,b,c,d', custom_only=True)
-    player.join()
-    time.sleep(4)
-    player.close()
+    def test_draw(self):
+        canvas = self._get_location(self.canvas, False)
+        line = np.array([600, 0])
+        for i in range(10):
+            v = np.array([20, 40 + i*40])
+            self.mouse.move_to(canvas + v).press().move_to(canvas + v + line).release()
+
+
+if __name__ == '__main__':
+    # player = Browser()
+    # player.go_to_url()
+    # time.sleep(2)
+    # # player.check()
+    # # player.create(rounds=7, custom_words='a,b,c,d', custom_only=True)
+    # # player.join()
+    # player.close()
+
+    p1 = Browser()
+    url = p1.create(rounds=2)
+    p2 = Browser()
+    p2.join(url)
+
+    while p1.num_players() != 2:
+        time.sleep(0.5)
+
+    p1.start()
+    # p1.palette.save('resources/new.gpl')
+    w = p2.get_options()
+    p2.pick_option(w[1])
+    time.sleep(0.5)
+    # p2.test()
+    name = 'apple'.lower()
+    pos = p2.mouse.mouse.position
+    start = time.time()
+    svg = SVG.from_file(f'db/{name}.svg')
+    # svg = SVG.import_from(f'tmp/xprt/{name}.txt')
+    print(time.time() - start)
+    # p2.test_draw()
+    p2.draw(svg, 45)
+    p2.mouse.move_to(pos)
+    p1.type(w[1] + '\n')
+    time.sleep(5)
+    # p2.clear_canvas()
+    # p2.save_canvas(f'tmp/dump/{name}.png')
+    p2.close()
+    p1.close()
