@@ -41,6 +41,7 @@ class Browser:
     TYPE_SPEED = 0.1
     count = 0
     BENCHMARK = False
+    LOGIN = 'loginAvatarCustomizeContainer'
 
 
     def __init__(self, action=False, logger=None):
@@ -67,9 +68,12 @@ class Browser:
             url = self.URL
         for _ in range(retries):
             try:
+                self.logger.debug('setting url to %s', url)
                 self.driver.get(url)
+                self.logger.debug('locating element %s', self.LOGIN)
                 elem = WebDriverWait(self.driver, 10).until(
-                    EC.visibility_of_element_located((By.ID, 'loginAvatarCustomizeContainer')))
+                    EC.visibility_of_element_located((By.ID, self.LOGIN)))
+                self.logger.debug('Element %s located', self.LOGIN)
                 return elem
             except exceptions.TimeoutException:
                 print(f'Loading {url} failed. Retrying ...')
@@ -149,13 +153,13 @@ class Browser:
         self._click(elem)
 
         time.sleep(self.WAIT_TIME)
-        self.load()
 
 
     def stage(self):
         try:
             try:
                 if self.driver.find_element(By.ID, 'aipPrerollContainer').is_displayed():
+                    self.loaded = False
                     return Stage.AD
             except exceptions.NoSuchElementException:
                 pass
@@ -216,7 +220,12 @@ class Browser:
 
 
     def get_current_word(self):
-        return self.driver.find_element(By.ID, 'currentWord').text
+        elem = WebDriverWait(self.driver, self.TIME_LIMIT).until(
+                EC.visibility_of_element_located((By.ID, 'currentWord')))
+        if not elem.text:
+            time.sleep(0.5)
+            return self.get_current_word()
+        return elem.text
 
 
     def set_current_word(self, word):
@@ -225,14 +234,19 @@ class Browser:
 
 
     def load(self):
+        self.logger.debug('loading elements %s', self.loaded)
         if not self.loaded:
+            time.sleep(0.5)
             self.toolbar = self.driver.find_element(By.CLASS_NAME, 'containerToolbar')
             self.colors = self._load_colors(self.toolbar)
             self.palette = self._create_palette(self.colors)
             self.tools = self._load_tools(self.toolbar)
             self.brushes = self._load_brushes(self.toolbar)
             self.canvas = self.driver.find_element(By.ID, 'canvasGame')
+            self.chat = WebDriverWait(self.driver, self.TIME_LIMIT).until(
+                EC.element_to_be_clickable((By.ID, 'inputChat')))
             self.loaded = True
+            self.logger.debug('Elements loaded ...')
 
 
     def save_canvas(self, filepath):
@@ -412,12 +426,11 @@ class Browser:
 
 
     def focus_chat(self):
-        self.driver.find_element(By.ID, 'inputChat').click()
+        self.chat.click()
 
 
     def type(self, text):
-        elem = self.driver.find_element(By.ID, 'inputChat')
-        self._type(elem, text)
+        self._type(self.chat, text)
 
 
     def close(self):
