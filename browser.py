@@ -63,6 +63,14 @@ class Browser:
         self.resert_draw(0)
 
 
+    def focus(self):
+        self.driver.execute_script(f'window.focus()')
+
+
+    def resize(self):
+        self.driver.set_window_size(1380, 920)
+
+
     def go_to_url(self, url=None, retries=5):
         if not url:
             url = self.URL
@@ -157,15 +165,21 @@ class Browser:
 
     def stage(self):
         try:
+            # try:
+            #     if self.driver.find_element(By.ID, 'aipPrerollContainer').is_displayed():
+            #         self.loaded = False
+            #         return Stage.AD
+            # except exceptions.NoSuchElementException:
+            #     pass
+            if self.driver.find_element(By.ID, 'loginAvatarCustomizeContainer').is_displayed():
+                self.loaded = False
+                return Stage.LOGIN
             try:
-                if self.driver.find_element(By.ID, 'aipPrerollContainer').is_displayed():
+                if not self.driver.find_element(By.ID, 'screenGame').is_displayed():
                     self.loaded = False
                     return Stage.AD
             except exceptions.NoSuchElementException:
                 pass
-            if self.driver.find_element(By.ID, 'loginAvatarCustomizeContainer').is_displayed():
-                self.loaded = False
-                return Stage.LOGIN
             self.load()
             overlay = self.driver.find_element(By.ID, 'overlay')
             if overlay.is_displayed():
@@ -323,51 +337,58 @@ class Browser:
     def draw(self, svg, speed=0):
         self.resert_draw(speed)
         sizes = np.array(sorted(self.brushes.keys()), dtype=np.int32)
+        size_multiplier = [1.0, 0.9, 0.8, 0.7]
         canvas = self._get_location(self.canvas, False)
         cmx, cmy = self.canvas.size['width'] // 2, self.canvas.size['height'] // 2
-        for obj in svg.paths:
-            if not self.toolbar.is_displayed():
-                return
-            ac = None
-            if obj.color:
-                self.changeTool('pen')
-                self.changeBrush(sizes[np.argmin(np.abs(sizes - obj.thickness))])
-                self.changeColor(self.palette.nearest(obj.color))
-                dur = speed // 2 if svg.is_solo_line(obj) else speed
-                if not self.action:
-                    ac = ActionChains(self.driver, duration=dur).move_to_element(self.canvas)
-                    ac = ac.move_by_offset(-cmx, -cmy)
-                lst = 0, 0
-                for lines in svg.get_points(obj):
-                    if not self.toolbar.is_displayed():
-                        return
-                    cur = lines[0]
-                    if self.action:
-                        self.mouse.move_to(cur + canvas).press()
-                    else:
-                        dx, dy = cur[0] - lst[0], cur[1] - lst[1]
-                        ac = ac.move_by_offset(dx, dy).click_and_hold()
-                    lst = cur
-                    for cur in lines[1:]:
+        try:
+            for obj in svg.paths:
+                if not self.toolbar.is_displayed():
+                    return
+                ac = None
+                if obj.color:
+                    self.changeTool('pen')
+                    brush_size = np.argmin(np.abs(sizes - obj.thickness))
+                    self.changeBrush(sizes[brush_size])
+                    self.changeColor(self.palette.nearest(obj.color))
+                    line_boost = 0.75 if svg.is_solo_line(obj) else 1
+                    dur = int(self.speed * size_multiplier[brush_size] * line_boost)
+                    # print(svg.is_solo_line(obj), brush_size, dur)
+                    if not self.action:
+                        ac = ActionChains(self.driver, duration=dur).move_to_element(self.canvas)
+                        ac = ac.move_by_offset(-cmx, -cmy)
+                    lst = 0, 0
+                    for lines in svg.get_points(obj):
+                        if not self.toolbar.is_displayed():
+                            return
+                        cur = lines[0]
                         if self.action:
-                            self.mouse.move_to(cur + canvas, False)
+                            self.mouse.move_to(cur + canvas).press()
                         else:
                             dx, dy = cur[0] - lst[0], cur[1] - lst[1]
-                            ac = ac.move_by_offset(dx, dy)
+                            ac = ac.move_by_offset(dx, dy).click_and_hold()
                         lst = cur
-                if self.action:
-                    self.mouse.release()
-                else:
-                    ac.release().perform()
-            if obj.fill:
-                self.changeTool('fill')
-                self.changeColor(self.palette.nearest(obj.fill))
-                if self.action:
-                    self.mouse.move_to(np.array([obj.cx, obj.cy]) + canvas).click()
-                else:
-                    self.delay(5)
-                    ac = ActionChains(self.driver, duration=speed).move_to_element(self.canvas)
-                    ac.move_by_offset(obj.cx - cmx, obj.cy - cmy).click().perform()
+                        for cur in lines[1:]:
+                            if self.action:
+                                self.mouse.move_to(cur + canvas, False)
+                            else:
+                                dx, dy = cur[0] - lst[0], cur[1] - lst[1]
+                                ac = ac.move_by_offset(dx, dy)
+                            lst = cur
+                    if self.action:
+                        self.mouse.release()
+                    else:
+                        ac.release().perform()
+                if obj.fill:
+                    self.changeTool('fill')
+                    self.changeColor(self.palette.nearest(obj.fill))
+                    if self.action:
+                        self.mouse.move_to(np.array([obj.cx, obj.cy]) + canvas).click()
+                    else:
+                        self.delay(5)
+                        ac = ActionChains(self.driver, duration=speed).move_to_element(self.canvas)
+                        ac.move_by_offset(obj.cx - cmx, obj.cy - cmy).click().perform()
+        except exceptions.ElementNotInteractableException:
+            pass
 
 
     def start(self):
@@ -397,6 +418,12 @@ class Browser:
         elem = overlay.find_element(By.CLASS_NAME, 'wordContainer')
         self.options = [(e.text, e) for e in elem.find_elements(By.CLASS_NAME, 'word')]
         return [e[0] for e in self.options]
+
+
+    def set_options_color(self, available):
+        for op, check in zip(self.options, available):
+            color = 'green' if check else 'red'
+            self.driver.execute_script(f'arguments[0].style.backgroundColor = "{color}"', op[1])
 
 
     def save_options(self, path='tmp/history.txt'):

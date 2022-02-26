@@ -36,6 +36,10 @@ class Mouse:
         return [p1.tolist(), c1.tolist(), c2.tolist(), p2.tolist()]
 
 
+    def get_position(self):
+        return self.mouse.position
+
+
     def move_to(self, pos, wind=True):
         old = self.mouse.position
         if wind:

@@ -190,14 +190,15 @@ class SVG:
             return [(x2, y2), (x3, y3)]
 
 
-    def _ln(self, x1, y1, x2, y2):
+    def _ln(self, x1, y1, x2, y2, d=0):
         dist = math.dist((x1, y1), (x2, y2))
-        if dist > self.DIST_THRESHOLD:
+        th = self.PIXEL_THRESHOLD if d < 3 else self.DIST_THRESHOLD
+        if dist > th:
             xm = int((x1 + x2) / 2 + random.uniform(-self.HUMAN_ERROR, self.HUMAN_ERROR) + SVG.ROUND)
             ym = int((y1 + y2) / 2 + random.uniform(-self.HUMAN_ERROR, self.HUMAN_ERROR) + SVG.ROUND)
             xm = min(max(xm, self.left), self.right)
             ym = min(max(ym, self.top), self.bottom)
-            return self._ln(x1, y1, xm, ym) + self._ln(xm, ym, x2, y2)
+            return self._ln(x1, y1, xm, ym, d+1) + self._ln(xm, ym, x2, y2, d+1)
         else:
             return [(x2, y2)]
 
