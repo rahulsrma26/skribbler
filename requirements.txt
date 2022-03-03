@@ -1,3 +1,11 @@
+numpy
+requests
 mss
 pynput
 pillow
+pygetwindow
+svgelements
+selenium
+colorama
+clipboard
+python-dotenv

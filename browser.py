@@ -44,7 +44,7 @@ class Browser:
     LOGIN = 'loginAvatarCustomizeContainer'
 
 
-    def __init__(self, action=False, logger=None):
+    def __init__(self, action=False, logger=None, update_counter=True):
         self.logger = logger or logging.getLogger(__file__)
         chrome_options = webdriver.ChromeOptions()
         chrome_options.add_experimental_option("excludeSwitches", ['enable-automation'])
@@ -56,7 +56,8 @@ class Browser:
         self.offset = np.array([self.offsetX, self.offsetY])
         self.mouse = Mouse()
         self.action = action
-        Browser.count += 1
+        if update_counter:
+            Browser.count += 1
         self.options = self.word = None
         self.rounds = self.draw_time = None
         self.loaded = False
@@ -71,7 +72,7 @@ class Browser:
         self.driver.set_window_size(1380, 920)
 
 
-    def go_to_url(self, url=None, retries=5):
+    def go_to_url(self, url=None, retries=3):
         if not url:
             url = self.URL
         for _ in range(retries):
