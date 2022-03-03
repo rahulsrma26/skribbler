@@ -41,9 +41,8 @@ class WordDB:
         return tree
 
 
-    def find(self, word):
+    def find(self, word, display=True):
         word = word.lower()
-        print(f'Searching for {word} ...')
         df = self.df
         df = df[df[self.CHARS] == len(word)]
         df = df[df[self.WORDS] == len(word.split(' '))]
@@ -51,7 +50,11 @@ class WordDB:
         for i, c in enumerate(word):
             if c != '_':
                 possible.intersection_update(set(self.tree[c][i]))
-        self.print(sorted(list(possible)))
+        possible = sorted(list(possible))
+        if display:
+            print(f'Searching for {word} ...')
+            self.print(possible)
+        return possible
 
 
     def print(self, words, columns=120):
