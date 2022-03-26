@@ -1,4 +1,5 @@
 import random
+import platform
 import time
 import base64
 import logging
@@ -42,15 +43,17 @@ class Browser:
     count = 0
     BENCHMARK = False
     LOGIN = 'loginAvatarCustomizeContainer'
+    WINDOWS = 'windows' in platform.system().lower()
 
 
     def __init__(self, action=False, logger=None, update_counter=True):
         self.logger = logger or logging.getLogger(__file__)
         chrome_options = webdriver.ChromeOptions()
         chrome_options.add_experimental_option("excludeSwitches", ['enable-automation'])
-        self.driver = webdriver.Chrome('chromedriver.exe', options=chrome_options)
-        self.driver.set_window_size(1380, 920)
+        filepath = 'chromedriver.exe' if self.WINDOWS else './chromedriver'
+        self.driver = webdriver.Chrome(filepath, options=chrome_options)
         self.driver.set_window_position(1380 * Browser.count, 10)
+        self.resize()
         self.offsetX = self.driver.execute_script('return window.outerWidth - window.innerWidth;') // 2
         self.offsetY = self.driver.execute_script('return window.outerHeight - window.innerHeight;') - self.offsetX
         self.offset = np.array([self.offsetX, self.offsetY])
@@ -69,7 +72,10 @@ class Browser:
 
 
     def resize(self):
-        self.driver.set_window_size(1380, 920)
+        if self.WINDOWS:
+            self.driver.set_window_size(1380, 920)
+        else:
+            self.driver.set_window_size(1364, 920)
 
 
     def go_to_url(self, url=None, retries=3):
@@ -500,22 +506,23 @@ if __name__ == '__main__':
         time.sleep(0.5)
 
     p1.start()
+    p2.load()
     # p1.palette.save('resources/new.gpl')
     w = p2.get_options()
     p2.pick_option(w[1])
     time.sleep(0.5)
     # p2.test()
-    name = 'apple'.lower()
-    pos = p2.mouse.mouse.position
+    name = 'bruce lee'.lower()
+    # pos = p2.mouse.mouse.position
     start = time.time()
     svg = SVG.from_file(f'db/{name}.svg')
     # svg = SVG.import_from(f'tmp/xprt/{name}.txt')
     print(time.time() - start)
     # p2.test_draw()
     p2.draw(svg, 45)
-    p2.mouse.move_to(pos)
+    # p2.mouse.move_to(pos)
     p1.type(w[1] + '\n')
-    time.sleep(5)
+    # time.sleep(5)
     # p2.clear_canvas()
     # p2.save_canvas(f'tmp/dump/{name}.png')
     p2.close()
