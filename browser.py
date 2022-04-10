@@ -124,6 +124,13 @@ class Browser:
         self.draw_time = draw_time
         time.sleep(self.WAIT_TIME)
 
+        try:
+            elem = WebDriverWait(self.driver, self.TIME_LIMIT).until(
+                    EC.visibility_of_element_located((By.ID, 'cmpwelcomebtnyes')))
+            self._click(elem)
+        except exceptions.NoSuchElementException:
+            pass
+
         if name:
             elem = WebDriverWait(self.driver, self.TIME_LIMIT).until(
                 EC.visibility_of_element_located((By.ID, 'inputName')))
@@ -156,6 +163,13 @@ class Browser:
             print("Error!!! Check internet!!!")
             quit()
         time.sleep(self.WAIT_TIME)
+
+        try:
+            elem = WebDriverWait(self.driver, self.TIME_LIMIT).until(
+                    EC.visibility_of_element_located((By.ID, 'cmpwelcomebtnyes')))
+            self._click(elem)
+        except exceptions.NoSuchElementException:
+            pass
 
         if name:
             elem = WebDriverWait(self.driver, self.TIME_LIMIT).until(
@@ -512,7 +526,7 @@ if __name__ == '__main__':
     p2.pick_option(w[1])
     time.sleep(0.5)
     # p2.test()
-    name = 'bruce lee'.lower()
+    name = 'onion'.lower()
     # pos = p2.mouse.mouse.position
     start = time.time()
     svg = SVG.from_file(f'db/{name}.svg')
@@ -521,6 +535,7 @@ if __name__ == '__main__':
     # p2.test_draw()
     p2.draw(svg, 45)
     # p2.mouse.move_to(pos)
+    time.sleep(2)
     p1.type(w[1] + '\n')
     # time.sleep(5)
     # p2.clear_canvas()
