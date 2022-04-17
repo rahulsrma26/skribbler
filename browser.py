@@ -372,7 +372,8 @@ class Browser:
                     self.changeBrush(sizes[brush_size])
                     self.changeColor(self.palette.nearest(obj.color))
                     line_boost = 0.75 if svg.is_solo_line(obj) else 1
-                    dur = int(self.speed * size_multiplier[brush_size] * line_boost)
+                    rel_speed = obj.speed / 100
+                    dur = int(self.speed * size_multiplier[brush_size] * line_boost / rel_speed)
                     # print(svg.is_solo_line(obj), brush_size, dur)
                     if not self.action:
                         ac = ActionChains(self.driver, duration=dur).move_to_element(self.canvas)

@@ -1,3 +1,4 @@
+import re
 import math
 import random
 from xml.dom import minidom
@@ -6,6 +7,7 @@ from utils.palette import hex2bgr, bgr2hex
 
 
 class SVGElement:
+    SPEED_RE = re.compile(r"\[([0-9]+)s\]")
     def __init__(self, elem):
         self.elem = elem
         self.style = dict([tuple(e.split(':')) for e in elem.getAttribute('style').split(';')])
@@ -15,6 +17,8 @@ class SVGElement:
         self.name = self.id = elem.getAttribute('id') if elem.hasAttribute('id') else ''
         if elem.hasAttribute('inkscape:label'):
             self.name = elem.getAttribute('inkscape:label')
+        result = self.SPEED_RE.search(self.name)
+        self.speed = int(result.group(1)) if result else 100
         self.transform = None
         if elem.hasAttribute('transform'):
             self.transform = Matrix(elem.getAttribute('transform'))
@@ -49,6 +53,8 @@ class PathElement(SVGElement):
         line = ''
         if self.color:
             line = f'P {self.thickness} {bgr2hex(*self.color)}'
+            if self.speed != 100:
+                line += f' {self.speed}'
             for obj in self.path:
                 if isinstance(obj, Line) or isinstance(obj, Close):
                     line += f':L {pts(obj.start)} {pts(obj.end)}'
@@ -73,9 +79,11 @@ class PathElement(SVGElement):
             obj.fill = hex2bgr(color)
         else:
             init, *segments = line.split(':')
-            _, thickness, color = init.split()
+            _, thickness, color, *extra = init.split()
             obj.thickness = int(thickness)
             obj.color = hex2bgr(color)
+            if extra:
+                obj.speed = int(extra[0])
             for segment in segments:
                 if segment.startswith('L'):
                     _, start, end = segment.split()
