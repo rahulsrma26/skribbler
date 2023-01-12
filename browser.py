@@ -12,8 +12,10 @@ from selenium.common import exceptions
 from selenium.webdriver.support.color import Color
 from selenium.webdriver.support.select import Select
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support import expected_conditions as EC
+from webdriver_manager.chrome import ChromeDriverManager
 
 from utils.svg import SVG
 from utils.palette import Palette
@@ -48,10 +50,10 @@ class Browser:
 
     def __init__(self, action=False, logger=None, update_counter=True):
         self.logger = logger or logging.getLogger(__file__)
-        chrome_options = webdriver.ChromeOptions()
-        chrome_options.add_experimental_option("excludeSwitches", ['enable-automation'])
-        filepath = 'chromedriver.exe' if self.WINDOWS else './chromedriver'
-        self.driver = webdriver.Chrome(filepath, options=chrome_options)
+        svc = Service(ChromeDriverManager().install())
+        opt = webdriver.ChromeOptions()
+        opt.add_experimental_option("excludeSwitches", ['enable-automation'])
+        self.driver = webdriver.Chrome(service=svc, options=opt)
         self.driver.set_window_position(1380 * Browser.count, 10)
         self.resize()
         self.offsetX = self.driver.execute_script('return window.outerWidth - window.innerWidth;') // 2
@@ -527,7 +529,7 @@ if __name__ == '__main__':
     p2.pick_option(w[1])
     time.sleep(0.5)
     # p2.test()
-    name = 'onion'.lower()
+    name = 'superman'.lower()
     # pos = p2.mouse.mouse.position
     start = time.time()
     svg = SVG.from_file(f'db/{name}.svg')
